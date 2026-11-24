@@ -1,0 +1,44 @@
+{
+  "name": "image-compressor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "图片压缩工具 PicSqueeze —— Vue 3 + TypeScript + Naive UI 前端，Express + Sharp 后端",
+  "main": "server.js",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node --watch server.js",
+    "dev:web": "vite --config frontend/vite.config.mts",
+    "build": "vue-tsc --noEmit -p frontend/tsconfig.json && vite build --config frontend/vite.config.mts",
+    "typecheck": "vue-tsc --noEmit -p frontend/tsconfig.json",
+    "preview": "vite preview --config frontend/vite.config.mts",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "keywords": [
+    "image",
+    "compress",
+    "sharp",
+    "express"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "axios": "^1.21.1",
+    "express": "^5.3.0",
+    "multer": "^2.5.0",
+    "naive-ui": "^2.45.3",
+    "pinia": "^4.1.0",
+    "sharp": "^0.35.5",
+    "vue": "^3.5.46"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "concurrently": "^10.0.7",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8",
+    "vue-tsc": "^3.3.14"
+  }
+}
