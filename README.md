@@ -157,3 +157,43 @@ npm install
 
 **压缩后体积反而变大？**
 部分图片本身已高度优化（例如已经是高质量 WebP），再压缩空间有限。可降低质量或限制最大宽度后重试。
+
+## 部署
+
+### 为什么 Vercel 一键部署会 404
+
+Vercel 的一键部署只会托管 Vite 构建出的 `dist/` 静态文件；`/api/compress` 需要 Express + Sharp 运行时，静态托管里没有这个进程，所以返回 404。
+
+这个应用也不适合整体跑在 Vercel Serverless 上：压缩结果写在本地 `storage/`，Serverless 没有持久磁盘；单次上传可达 10 张 × 10MB，通常会超过函数请求体限额（以 Vercel 控制台当前说明为准）。
+
+### 推荐：前端 Vercel + 后端独立 Node 托管
+
+**1. 部署后端**（Railway / Render / Fly.io / 自有 VPS 任选一个支持长期运行 Node 的平台）
+
+- 根目录：仓库根目录
+- 构建命令：`npm install && npm run build`
+- 启动命令：`npm start`
+- Node 版本：`22`（见 `.nvmrc`，需 ≥ 20.19）
+- 环境变量：`PORT` 由平台提供；`CORS_ORIGIN=https://<你的项目>.vercel.app`（多个域名用逗号分隔，`*` 表示放行全部）
+- 保持**单实例**运行：结果文件存在本地 `storage/`，多实例会导致预览/下载 404
+- 部署后访问 `https://<后端域名>/api/health`，应返回 `{"ok":true,...}`
+
+**2. 部署前端到 Vercel**
+
+- 导入同一个 GitHub 仓库；`vercel.json` 已锁定构建命令和产物目录 `dist/`
+- 在 Vercel 项目 Settings → Environment Variables 添加：
+  ```text
+  VITE_API_BASE_URL = https://<后端域名>/api
+  ```
+- 重新 Deploy（改环境变量后必须重新构建）
+- 验证：浏览器 Network 面板里 `/api/compress` 请求应打到后端域名并返回 200
+
+前端接口地址由 `VITE_API_BASE_URL` 统一控制，预览图、单张下载、ZIP 下载会自动使用同一个后端域名，无需改业务代码。
+
+**3. 本地开发与同域部署不受影响**
+
+不设置 `VITE_API_BASE_URL` 时仍走 `/api`：本地由 Vite 代理到 3000；若把 `dist/` 交给 Express 托管，则前后端同域，不需要 CORS 和该环境变量。
+
+### 更省事：整套应用放在同一个 Node 主机
+
+在 Railway / Render / VPS 上构建 `npm run build` 并启动 `npm start`，Express 会同时托管 `dist/` 和 `/api`。这种方案只有一个部署、同源请求、无跨域配置，也不需要 Vercel。

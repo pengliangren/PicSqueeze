@@ -1,4 +1,4 @@
-import { http } from './http'
+import { apiUrl, http } from './http'
 import type { CompressResponse, CompressSettings } from '../types'
 
 export async function compressImages(
@@ -31,5 +31,5 @@ export async function fetchZip(ids: string[]): Promise<Blob> {
   return data
 }
 
-export const previewUrl = (id: string): string => `/api/files/${id}`
-export const downloadUrl = (id: string): string => `/api/download/${id}`
+export const previewUrl = (id: string): string => apiUrl(`/files/${id}`)
+export const downloadUrl = (id: string): string => apiUrl(`/download/${id}`)

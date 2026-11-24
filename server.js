@@ -194,6 +194,24 @@ async function compressOne(file, options) {
 const app = express();
 app.disable('x-powered-by');
 
+// 前后端分离部署时，用 CORS_ORIGIN 放行前端域名（多个域名用英文逗号分隔）
+const CORS_ORIGIN = String(process.env.CORS_ORIGIN || '').trim();
+if (CORS_ORIGIN) {
+  const allowedOrigins = CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (allowedOrigins.includes('*') || allowedOrigins.includes(origin))) {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigins.includes('*') ? '*' : origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Max-Age', '86400');
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES },
