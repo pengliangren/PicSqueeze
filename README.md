@@ -52,7 +52,7 @@ PORT=8080 npm start
 
 ## 功能说明
 
-- **上传**：拖放、点击选择、剪贴板粘贴（Ctrl+V）三种方式，单次最多 10 张，单张最大 10MB。
+- **上传**：拖放、点击选择、剪贴板粘贴（Ctrl+V）三种方式。Vercel 部署下单次最多 2 张、单张最大 2MB（Vercel Hobby 请求体上限 4.5MB）；本地 Express 部署由 `server.js` 控制，为单次最多 10 张、单张最大 10MB。
 - **统一大图预览**：待处理缩略图、压缩前后对比图都接入同一个预览组件，支持左右切换、方向键、Esc 关闭、手机滑动切换。
 - **压缩质量**：高画质（85）/ 均衡（70）/ 高压缩（50）/ 自定义（10–100 滑杆）。
 - **输出格式**：保持原格式，或统一转为 JPG / PNG / WebP。
@@ -160,40 +160,38 @@ npm install
 
 ## 部署
 
-### 为什么 Vercel 一键部署会 404
+### 纯 Vercel 部署（无需后端平台）
 
-Vercel 的一键部署只会托管 Vite 构建出的 `dist/` 静态文件；`/api/compress` 需要 Express + Sharp 运行时，静态托管里没有这个进程，所以返回 404。
+项目已同时提供两套接口实现：
 
-这个应用也不适合整体跑在 Vercel Serverless 上：压缩结果写在本地 `storage/`，Serverless 没有持久磁盘；单次上传可达 10 张 × 10MB，通常会超过函数请求体限额（以 Vercel 控制台当前说明为准）。
+| 文件 | 用途 | 运行方式 |
+| --- | --- | --- |
+| `server.js` | 本地开发 / 同域 Express 部署 | `npm start`，结果写入本地 `storage/` |
+| `api/compress.js`、`api/health.js` | Vercel Serverless Functions | Vercel 自动识别 `api/` 目录 |
 
-### 推荐：前端 Vercel + 后端独立 Node 托管
+Vercel 部署流程：
 
-**1. 部署后端**（Railway / Render / Fly.io / 自有 VPS 任选一个支持长期运行 Node 的平台）
+1. 导入 GitHub 仓库，框架选 Vite；`vercel.json` 已锁定 `npm run build` 和产物目录 `dist/`。
+2. 直接 Deploy，**不需要**配置 `VITE_API_BASE_URL`、`CORS_ORIGIN` 等任何环境变量（前后端同源）。
+3. 验证：`https://<你的项目>.vercel.app/api/health` 返回 `{"ok":true,"runtime":"vercel"}`。
 
-- 根目录：仓库根目录
-- 构建命令：`npm install && npm run build`
-- 启动命令：`npm start`
-- Node 版本：`22`（见 `.nvmrc`，需 ≥ 20.19）
-- 环境变量：`PORT` 由平台提供；`CORS_ORIGIN=https://<你的项目>.vercel.app`（多个域名用逗号分隔，`*` 表示放行全部）
-- 保持**单实例**运行：结果文件存在本地 `storage/`，多实例会导致预览/下载 404
-- 部署后访问 `https://<后端域名>/api/health`，应返回 `{"ok":true,...}`
+Vercel 版本的实现细节：
 
-**2. 部署前端到 Vercel**
+- 压缩结果不写入磁盘，而是以 `data:image/...;base64,...` 随 JSON 返回；
+- 预览大图、单张下载、ZIP 打包全部在浏览器完成，因此不需要持久存储；
+- 上传限制为 **单张 2MB、单次 2 张**，因为 Vercel Functions 默认请求体和响应体上限均为 **4.5MB**（Hobby 计划，以官方文档为准）；
+- 若升级到 Pro 并启用 Fluid Compute + 4GB 内存 + `VERCEL_SUPPORT_LARGE_REQUEST_BODY=1`，请求体上限可提升到 20MiB，届时可同步调大 `types.ts` 与 `api/compress.js` 中的常量。
 
-- 导入同一个 GitHub 仓库；`vercel.json` 已锁定构建命令和产物目录 `dist/`
-- 在 Vercel 项目 Settings → Environment Variables 添加：
-  ```text
-  VITE_API_BASE_URL = https://<后端域名>/api
-  ```
-- 重新 Deploy（改环境变量后必须重新构建）
-- 验证：浏览器 Network 面板里 `/api/compress` 请求应打到后端域名并返回 200
+### 本地 Express / 同域 Node 主机部署
 
-前端接口地址由 `VITE_API_BASE_URL` 统一控制，预览图、单张下载、ZIP 下载会自动使用同一个后端域名，无需改业务代码。
+```bash
+npm run build
+npm start
+```
 
-**3. 本地开发与同域部署不受影响**
+Express 会同时托管 `dist/` 和 `/api`，同源请求、无需跨域配置。此时上传限制为单张 10MB、单次 10 张，压缩结果写入 `storage/` 并在 1 小时后清理，需保持单实例运行。
 
-不设置 `VITE_API_BASE_URL` 时仍走 `/api`：本地由 Vite 代理到 3000；若把 `dist/` 交给 Express 托管，则前后端同域，不需要 CORS 和该环境变量。
+如需把前端单独部署到其他平台并跨域调用 Express，可设置：
 
-### 更省事：整套应用放在同一个 Node 主机
-
-在 Railway / Render / VPS 上构建 `npm run build` 并启动 `npm start`，Express 会同时托管 `dist/` 和 `/api`。这种方案只有一个部署、同源请求、无跨域配置，也不需要 Vercel。
+- 前端：`VITE_API_BASE_URL=https://<后端域名>/api`
+- 后端：`CORS_ORIGIN=https://<前端域名>`

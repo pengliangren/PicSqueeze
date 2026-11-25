@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { NAlert, NButton, useMessage } from 'naive-ui'
-import { fetchZip } from '../api/compress'
+import { fetchZip, zipResults } from '../api/compress'
 import { getErrorMessage } from '../api/http'
 import { useCompressorStore } from '../stores/compressor'
 import { formatBytes } from '../utils/format'
@@ -22,7 +22,11 @@ async function downloadAll(): Promise<void> {
 
   const hide = message.loading('正在打包，请稍候…', { duration: 0 })
   try {
-    const blob = await fetchZip(store.downloadableIds)
+    // Vercel 方案：结果以 data URL 返回，浏览器端打包；
+    // Express 同域部署：仍走服务端 /api/download-all
+    const blob = store.results.length > 0 && store.results.every((item) => item.dataUrl)
+      ? await zipResults(store.results)
+      : await fetchZip(store.downloadableIds)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url

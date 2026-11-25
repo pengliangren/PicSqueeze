@@ -20,7 +20,7 @@ const dimensionsChanged = computed(
     props.result.originalHeight !== props.result.height
 )
 
-const afterSrc = computed(() => props.result.url)
+const afterSrc = computed(() => props.result.dataUrl || props.result.url || '')
 const beforeSrc = computed(() => props.result.originalPreview || '')
 
 function openPreview(startIndex: number): void {
@@ -55,7 +55,7 @@ function openPreview(startIndex: number): void {
 
 function triggerDownload(): void {
   const link = document.createElement('a')
-  link.href = downloadUrl(props.result.id)
+  link.href = props.result.dataUrl || downloadUrl(props.result.id)
   link.download = props.result.outputName
   document.body.appendChild(link)
   link.click()
